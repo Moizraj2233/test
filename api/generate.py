@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from http.server import BaseHTTPRequestHandler
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -32,7 +33,13 @@ def product_terms(script):
     return found[:8]
 
 
-def search_items(query, marketplace, tag, client_id, client_secret):
+_TOKEN_CACHE = {}
+
+
+def access_token(client_id, client_secret):
+    cached = _TOKEN_CACHE.get(client_id)
+    if cached and cached[1] > time.time():
+        return cached[0]
     token_req = Request(
         "https://api.amazon.com/auth/o2/token",
         data=json.dumps({
@@ -43,8 +50,21 @@ def search_items(query, marketplace, tag, client_id, client_secret):
         }).encode(),
         headers={"Content-Type": "application/json"}, method="POST",
     )
-    with urlopen(token_req, timeout=25) as response:
-        token = json.load(response)["access_token"]
+    try:
+        with urlopen(token_req, timeout=25) as response:
+            result = json.load(response)
+    except HTTPError as error:
+        if error.code == 401:
+            raise ValueError("Amazon rejected the API Client ID/Secret. Check that both are current and from the same Creators API credential.")
+        if error.code == 429:
+            raise ValueError("Amazon is rate-limiting token requests. Wait a few minutes, then try again.")
+        raise ValueError(f"Amazon token request failed with HTTP {error.code}.")
+    token = result["access_token"]
+    _TOKEN_CACHE[client_id] = (token, time.time() + max(60, int(result.get("expires_in", 3600)) - 60))
+    return token
+
+
+def search_items(query, marketplace, tag, token):
     payload = {
         "keywords": query, "partnerTag": tag, "marketplace": marketplace,
         "searchIndex": "All", "itemCount": 5, "resources": ["itemInfo.title"],
@@ -66,9 +86,10 @@ class handler(BaseHTTPRequestHandler):
             terms = product_terms(data["script"])
             if not terms:
                 raise ValueError("Could not spot a product name. Include brand or model names clearly in the script.")
+            token = access_token(data["clientId"], data["clientSecret"])
             products = []
             for term in terms:
-                items = search_items(term, data["marketplace"], data["tag"], data["clientId"], data["clientSecret"])
+                items = search_items(term, data["marketplace"], data["tag"], token)
                 products.append({"mention": term, "matches": [
                     {"title": item.get("itemInfo", {}).get("title", {}).get("displayValue", "Amazon item"),
                      "url": item.get("detailPageURL", "")}
