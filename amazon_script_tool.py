@@ -3,6 +3,7 @@ import os
 import re
 import secrets
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.error import HTTPError
@@ -15,9 +16,22 @@ HTML = r'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="view
 const $=x=>document.getElementById(x);$('go').onclick=async()=>{if(!$('client').value.trim()||!$('secret').value.trim()||!$('tag').value.trim()||!$('script').value.trim()){ $('status').textContent='Add API credentials, tracking tag, and script.';return} $('go').disabled=true;$('status').textContent='Searching Amazon…';try{let r=await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:$('client').value.trim(),clientSecret:$('secret').value,marketplace:$('market').value,tag:$('tag').value.trim(),script:$('script').value})});let d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');$('out').textContent=d.output;$('results').hidden=false;$('status').textContent='Done';$('secret').value=''}catch(e){$('status').textContent=e.message}finally{$('go').disabled=false}};$('copy').onclick=()=>navigator.clipboard.writeText($('out').textContent);
 </script></html>'''
 
-def api_search(query, market, tag, client, secret):
+_TOKEN_CACHE = {}
+
+def access_token(client, secret):
+    cached = _TOKEN_CACHE.get(client)
+    if cached and cached[1] > time.time(): return cached[0]
     token_req=Request('https://api.amazon.com/auth/o2/token',data=json.dumps({'grant_type':'client_credentials','client_id':client,'client_secret':secret,'scope':'creatorsapi::default'}).encode(),headers={'Content-Type':'application/json'},method='POST')
-    with urlopen(token_req,timeout=30) as r: token=json.load(r)['access_token']
+    try:
+        with urlopen(token_req,timeout=30) as r: result=json.load(r)
+    except HTTPError as e:
+        if e.code == 401: raise RuntimeError('Amazon rejected the API Client ID/Secret. Check that both are current and from the same Creators API credential.')
+        if e.code == 429: raise RuntimeError('Amazon is rate-limiting token requests. Wait a few minutes, then try again.')
+        raise RuntimeError(f'Amazon token request failed with HTTP {e.code}.')
+    token = result['access_token']; _TOKEN_CACHE[client] = (token, time.time() + max(60, int(result.get('expires_in', 3600)) - 60))
+    return token
+
+def api_search(query, market, tag, token):
     body={'keywords':query,'partnerTag':tag,'marketplace':market,'searchIndex':'All','itemCount':5,'resources':['itemInfo.title']}
     req=Request('https://creatorsapi.amazon/catalog/v1/searchItems',data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json','x-marketplace':market},method='POST')
     with urlopen(req,timeout=30) as r: return json.load(r).get('searchResult',{}).get('items',[])
@@ -56,8 +70,9 @@ class Handler(BaseHTTPRequestHandler):
             script=data['script'];market=data['marketplace'];tag=data['tag'];terms=product_terms(script);client=data['clientId'];secret=data['clientSecret']
             if not terms: raise RuntimeError('Could not confidently spot product names. Mention brand/model names clearly in the script and try again.')
             lines=['PRODUCT LINKS']
+            token=access_token(client,secret)
             for term in terms:
-                items=api_search(term,market,tag,client,secret)
+                items=api_search(term,market,tag,token)
                 lines.append('\n'+term+':')
                 if not items: lines.append('  No matching listing returned.');continue
                 for item in items[:3]: lines.append('  - '+item.get('itemInfo',{}).get('title',{}).get('displayValue','Amazon product')+'\n    '+item.get('detailPageURL',''))
