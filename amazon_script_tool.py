@@ -23,7 +23,17 @@ def api_search(query, market, tag, client, secret):
     with urlopen(req,timeout=30) as r: return json.load(r).get('searchResult',{}).get('items',[])
 
 def product_terms(script):
-    # Capture explicit product mentions, brand/model tokens and repeated capitalized noun phrases.
+    ranked = re.compile(
+        r'(?i)\bAt number\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+),\s*'
+        r'(?:we have\s+)?(?:the\s+)?(.{3,110}?)'
+        r'(?=\s*,\s*(?:Model\b|[A-Z]{2,}[A-Z0-9-]{2,}\b)|\s+(?:is|uses|has|brings|features|offers|combines|takes|comes|records|supports|includes|works|gives|provides)\b|[,.!?])'
+    )
+    ranked_terms=[]
+    for match in ranked.finditer(script):
+        term=re.sub(r'^(?:we have\s+)?(?:the\s+)?','',match.group(1).strip(),flags=re.I).strip(' ,')
+        if len(term)>3 and term.lower() not in [x.lower() for x in ranked_terms]: ranked_terms.append(term)
+    if ranked_terms: return ranked_terms[:10]
+    # Fall back to model-like names for scripts that don't use ranked segments.
     patterns=[r'(?i)(?:product|gear|device|camera|phone|laptop|mic|microphone|headphones|keyboard|mouse|tripod|monitor|light|speaker|watch)\s+(?:is\s+)?(?:the\s+)?([A-Z][\w-]*(?:\s+[A-Z0-9][\w-]*){0,4})',r'\b(?:[A-Z][a-zA-Z0-9-]*\s+){1,4}(?:Pro|Max|Mini|Air|Ultra|4K|Mk\s?\d+)\b']
     found=[]
     for p in patterns:
