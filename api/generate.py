@@ -7,6 +7,17 @@ from urllib.request import Request, urlopen
 
 def product_terms(script):
     found = []
+    ranked = re.compile(
+        r"(?i)\bAt number\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+),\s*"
+        r"(?:we have\s+)?(?:the\s+)?(.{3,110}?)"
+        r"(?=\s*,\s*(?:Model\b|[A-Z]{2,}[A-Z0-9-]{2,}\b)|\s+(?:is|uses|has|brings|features|offers|combines|takes|comes|records|supports|includes|works|gives|provides)\b|[,.!?])"
+    )
+    for match in ranked.finditer(script):
+        term = re.sub(r"^(?:we have\s+)?(?:the\s+)?", "", match.group(1).strip(), flags=re.I).strip(" ,")
+        if len(term) > 3 and term.lower() not in {x.lower() for x in found}:
+            found.append(term)
+    if found:
+        return found[:10]
     for pattern in (
         r"\b(?:[A-Z][a-zA-Z0-9-]*\s+){1,4}(?:Pro|Plus|Max|Mini|Air|Ultra|4K|Mk\s?\d+)\b",
         r"\b[A-Z][a-zA-Z0-9-]*(?:\s+[A-Z0-9][a-zA-Z0-9-]*){1,3}\b",
