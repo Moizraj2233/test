@@ -1,15 +1,8 @@
-Amazon Script Affiliate Tool — Render free deployment
+Amazon Script Affiliate Links — free Render deploy
 
-This folder is a ready-to-deploy Render Blueprint. It uses only Python's standard library.
+The app accepts an Amazon Creators API Client ID and Secret, Associates tracking tag, marketplace, and a video script. It extracts product mentions and searches the Amazon Creators API, returning up to three possible matching affiliate listings per mention. It does not save credentials.
 
-Deploy:
-1. Put the files in this folder in a private GitHub repository.
-2. Sign in to Render and create a new Blueprint from that repository.
-3. Choose the free instance plan and deploy render.yaml.
-4. Open the generated https://<service>.onrender.com URL.
-5. Paste your Amazon Creators API Client ID, Secret, Associates tag, choose the marketplace, and paste your script.
+Deploy: https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FMoizraj2233%2Ftest
+Choose the Free plan. Render will ask you to sign in and authorize access to this repository, then deploy `render.yaml`.
 
-Credentials are submitted only when you click Generate and are not written to disk by this app. Use HTTPS on the hosted Render URL. Free Render services sleep after 15 minutes idle and may take about a minute to wake.
-
-The first version creates templated title ideas and a description; it does not use an AI writing API. Product detection is heuristic and results need a quick review before publishing.
-
+Free Render web services sleep after 15 minutes without traffic and can take about a minute to wake. The app uses heuristic product-name extraction; review matches before publishing.
