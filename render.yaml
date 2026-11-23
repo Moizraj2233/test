@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: amazon-script-affiliate-tool
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall -q amazon_script_tool.py
+    startCommand: python amazon_script_tool.py
+    healthCheckPath: /
+
