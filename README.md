@@ -1,8 +1,11 @@
-Amazon Script Affiliate Links — free Render deploy
+Amazon Script Affiliate Link Finder
 
-The app accepts an Amazon Creators API Client ID and Secret, Associates tracking tag, marketplace, and a video script. It extracts product mentions and searches the Amazon Creators API, returning up to three possible matching affiliate listings per mention. It does not save credentials.
+This tool is in `/amazon-link-tool/`. It accepts Creators API Client ID/Secret, an Associates tracking tag, marketplace, and a video script. It detects likely product names and returns up to three Creators API affiliate matches for each one. Credentials are used for the current request and are not stored.
 
-Deploy: https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FMoizraj2233%2Ftest
-Choose the Free plan. Render will ask you to sign in and authorize access to this repository, then deploy `render.yaml`.
+## Deploy on Vercel
 
-Free Render web services sleep after 15 minutes without traffic and can take about a minute to wake. The app uses heuristic product-name extraction; review matches before publishing.
+1. Import `Moizraj2233/test` into a Vercel project.
+2. Keep the project root directory as `.` and deploy with the Hobby plan.
+3. Open `https://<your-project>.vercel.app/amazon-link-tool/`.
+
+Vercel's Python runtime runs the `/api/generate` endpoint. The site uses the API credentials entered in the form; never commit credentials into this repository. Product-name detection is heuristic, so review each match.
